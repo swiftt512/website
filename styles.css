@@ -43,14 +43,11 @@ body {
   font-size: 15px;
   line-height: 1.9;
   letter-spacing: 0.02em;
-  /* Green ring cursor with a center dot for precision (hotspot = center) */
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='6' fill='%235cba5f' fill-opacity='0.85' stroke='%2316281a' stroke-width='1.5'/%3E%3Ccircle cx='10' cy='10' r='1' fill='%2316281a'/%3E%3C/svg%3E") 10 10, auto;
 }
 
-/* Gold ring on clickable things (keeps the "this is interactive" cue) */
-a, button, summary, label, .resume-btn, .modal-btn, [data-close] {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='6' fill='%23ffcf3f' fill-opacity='0.9' stroke='%2316281a' stroke-width='1.5'/%3E%3Ccircle cx='10' cy='10' r='1' fill='%2316281a'/%3E%3C/svg%3E") 10 10, pointer;
-}
+/* The glow orb replaces the native cursor (added by JS on fine pointers only,
+   so touch devices keep their normal behavior). */
+body.custom-cursor, body.custom-cursor * { cursor: none; }
 
 .wrap {
   max-width: 640px;
@@ -163,7 +160,7 @@ a, button, summary, label, .resume-btn, .modal-btn, [data-close] {
   .splash-inner { animation: none; }
 }
 
-/* --- Cursor trail (soft green shadow that lags behind the pointer) --- */
+/* --- Cursor glow orb (the cursor itself; tracks the pointer 1:1, no lag) --- */
 .cursor-trail {
   position: fixed;
   top: 0;
@@ -173,15 +170,32 @@ a, button, summary, label, .resume-btn, .modal-btn, [data-close] {
   margin: -11px 0 0 -11px;
   border-radius: 50%;
   background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
-  opacity: 0.55;
+  opacity: 0.6;
   pointer-events: none;
   z-index: 60;
   mix-blend-mode: multiply;
   will-change: transform;
+  /* Only size/brightness animate — position is set instantly so there's no drag. */
+  transition: width 0.12s ease, height 0.12s ease, margin 0.12s ease,
+              opacity 0.12s ease, background 0.12s ease;
+}
+
+/* Over a clickable: swell and brighten to gold. */
+.cursor-trail.hot {
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  opacity: 0.9;
+  background: radial-gradient(circle, var(--splash) 0%, transparent 70%);
 }
 
 @media (prefers-color-scheme: dark) {
-  .cursor-trail { mix-blend-mode: screen; opacity: 0.6; }
+  .cursor-trail { mix-blend-mode: screen; opacity: 0.7; }
+  .cursor-trail.hot { opacity: 0.95; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor-trail { transition: none; }
 }
 
 /* --- Leaderboard --- */

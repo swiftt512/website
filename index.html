@@ -98,31 +98,24 @@
       window.addEventListener("resize", fit);
     })();
 
-    // --- Cursor trail: a soft green shadow that eases toward the pointer ---
+    // --- Cursor glow orb: the glow IS the cursor. Tracks 1:1 (no lag),
+    //     and swells/brightens over clickable things. ---
     (function () {
       const trail = document.getElementById("cursor-trail");
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       const fine = window.matchMedia("(pointer: fine)").matches;
-      if (reduce || !fine) { trail.remove(); return; }
+      if (!fine) { trail.remove(); return; }
 
+      document.body.classList.add("custom-cursor"); // hide the native pointer
       trail.style.opacity = "0"; // stay hidden until the pointer first moves
-      let tx = window.innerWidth / 2, ty = window.innerHeight / 2;
-      let x = tx, y = ty;
       let seen = false;
+      const hotSel = "a, button, summary, label, [data-close], .resume-btn, .modal-btn";
 
       window.addEventListener("pointermove", (e) => {
-        tx = e.clientX; ty = e.clientY;
+        trail.style.transform = "translate(" + e.clientX + "px," + e.clientY + "px)";
         if (!seen) { seen = true; trail.style.opacity = ""; }
-      });
-
-      function loop() {
-        // The 0.18 easing factor is the "delay" — the shadow lags the cursor.
-        x += (tx - x) * 0.18;
-        y += (ty - y) * 0.18;
-        trail.style.transform = "translate(" + x + "px," + y + "px)";
-        requestAnimationFrame(loop);
-      }
-      requestAnimationFrame(loop);
+        const hot = e.target.closest ? e.target.closest(hotSel) : null;
+        trail.classList.toggle("hot", !!hot);
+      }, { passive: true });
     })();
 
     // --- Résumé preview modal ---
