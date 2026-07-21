@@ -1,0 +1,10 @@
+name = "njdt"
+pages_build_output_dir = "."
+compatibility_date = "2026-07-01"
+
+# D1 binding — Pages Functions read this at build time and expose it as env.DB.
+# database_id is not a secret (it's useless without account credentials).
+[[d1_databases]]
+binding = "DB"
+database_name = "njdt-leaderboard"
+database_id = "eb51aca7-bfec-4e6a-9bd4-6465464c506a"

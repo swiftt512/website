@@ -1,22 +1,44 @@
-// GET /api/leaderboard
-// Step 2: hardcoded JSON. In step 3 this reads from D1.
-// Ranking contract: score DESC, tiebreak earliest created_at (never by elapsed time).
-export function onRequestGet() {
-  const entries = [
-    { rank: 1, name: "ALEX",  score: 42, created_at: "2026-07-21T08:12:00-05:00" },
-    { rank: 2, name: "JORDAN", score: 38, created_at: "2026-07-21T07:45:00-05:00" },
-    { rank: 3, name: "SAM",   score: 31, created_at: "2026-07-21T09:03:00-05:00" },
-    { rank: 4, name: "TAYLOR", score: 27, created_at: "2026-07-21T06:58:00-05:00" },
-    { rank: 5, name: "MORGAN", score: 19, created_at: "2026-07-21T10:21:00-05:00" },
-  ];
+import { centralDate } from "../lib/central-time.js";
 
-  return new Response(
-    JSON.stringify({ date: "2026-07-21", entries }),
-    {
-      headers: {
-        "content-type": "application/json; charset=utf-8",
-        "cache-control": "no-store",
-      },
-    }
-  );
+// GET /api/leaderboard
+// Reads today's leaderboard from D1 (binding: env.DB).
+// Ranking contract: score DESC, tiebreak earliest created_at (never by
+// elapsed time). Read-only and public — it exposes only names + scores, so
+// there's nothing here a client could use to cheat.
+export async function onRequestGet({ env }) {
+  const date = centralDate();
+
+  try {
+    const { results } = await env.DB
+      .prepare(
+        `SELECT name, score, created_at
+           FROM leaderboard
+          WHERE puzzle_date = ?
+          ORDER BY score DESC, created_at ASC
+          LIMIT 10`
+      )
+      .bind(date)
+      .all();
+
+    const entries = (results || []).map((row, i) => ({
+      rank: i + 1,
+      name: row.name,
+      score: row.score,
+      created_at: row.created_at,
+    }));
+
+    return json({ date, entries });
+  } catch (err) {
+    return json({ date, entries: [], error: "leaderboard_unavailable" }, 500);
+  }
+}
+
+function json(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+    },
+  });
 }
