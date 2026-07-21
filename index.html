@@ -36,6 +36,26 @@
       </p>
     </section>
 
+    <section class="game" aria-labelledby="game-heading">
+      <h2 id="game-heading">Daily word board</h2>
+      <p class="game-sub" id="game-sub">Loading today's board…</p>
+
+      <div class="game-play" id="game-play" hidden>
+        <div class="board-grid" id="board-grid" role="grid" aria-label="Word board"></div>
+
+        <div class="rack" id="rack" aria-label="Your tiles"></div>
+
+        <div class="game-controls">
+          <input class="name-input" id="name-input" type="text" maxlength="12"
+                 placeholder="Your name" aria-label="Your name" autocomplete="off" spellcheck="false" />
+          <button class="game-btn" type="button" id="recall-btn">Recall</button>
+          <button class="game-btn primary" type="button" id="submit-btn">Submit word</button>
+        </div>
+
+        <p class="game-msg" id="game-msg" aria-live="polite"></p>
+      </div>
+    </section>
+
     <section class="board" aria-labelledby="board-heading">
       <h2 id="board-heading">Daily puzzle leaderboard</h2>
       <p class="board-sub" id="board-date">Loading…</p>
@@ -108,7 +128,7 @@
       document.body.classList.add("custom-cursor"); // hide the native pointer
       trail.style.opacity = "0"; // stay hidden until the pointer first moves
       let seen = false;
-      const hotSel = "a, button, summary, label, [data-close], .resume-btn, .modal-btn";
+      const hotSel = 'a, button, summary, label, [data-close], [role="button"], .resume-btn, .modal-btn, .tile';
 
       window.addEventListener("pointermove", (e) => {
         trail.style.transform = "translate(" + e.clientX + "px," + e.clientY + "px)";
@@ -150,30 +170,244 @@
       });
     })();
 
-    // --- Leaderboard (Step 2: fetch same-origin /api/leaderboard) ---
+    // --- Leaderboard (fetch same-origin /api/leaderboard) ---
+    //     Exposed as window.refreshLeaderboard so a successful play updates it.
     (function () {
       const list = document.getElementById("board-list");
       const dateEl = document.getElementById("board-date");
 
-      fetch("/api/leaderboard")
+      function esc(s) {
+        return String(s).replace(/[&<>"]/g, (c) =>
+          ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+      }
+
+      function refresh() {
+        return fetch("/api/leaderboard")
+          .then((r) => {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            return r.json();
+          })
+          .then((data) => {
+            dateEl.textContent = "Puzzle · " + data.date;
+            list.innerHTML = "";
+            for (const e of data.entries) {
+              const li = document.createElement("li");
+              li.className = "board-row";
+              li.innerHTML =
+                '<span class="board-name">' + esc(e.name) + "</span>" +
+                '<span class="board-score">' + e.score + "</span>";
+              list.appendChild(li);
+            }
+          })
+          .catch(() => {
+            dateEl.textContent = "Leaderboard unavailable right now.";
+          });
+      }
+
+      window.refreshLeaderboard = refresh;
+      refresh();
+    })();
+
+    // --- Daily word board game ---
+    //     Loads today's board from /api/puzzle, lets the player place rack tiles,
+    //     and submits placements to /api/play. The server computes the score and
+    //     validates every word — the client never scores anything or sees an answer.
+    (function () {
+      const sub = document.getElementById("game-sub");
+      const play = document.getElementById("game-play");
+      const gridEl = document.getElementById("board-grid");
+      const rackEl = document.getElementById("rack");
+      const msgEl = document.getElementById("game-msg");
+      const nameInput = document.getElementById("name-input");
+      const submitBtn = document.getElementById("submit-btn");
+      const recallBtn = document.getElementById("recall-btn");
+
+      let SIZE = 9;
+      let bonuses = [];
+      let values = {};
+      let seed = {};              // "r,c" -> letter (pre-placed, fixed)
+      let rack = [];              // [{ id, letter, at: null | {r,c} }]
+      let selected = null;        // rack tile id currently picked up
+      let locked = false;         // true after a play is recorded (until Recall)
+      const BONUS_LABEL = { dl: "DL", tl: "TL", dw: "DW", tw: "TW" };
+
+      const NAME_KEY = "njdt-name";
+      try { nameInput.value = localStorage.getItem(NAME_KEY) || ""; } catch (e) {}
+      nameInput.addEventListener("input", () => {
+        try { localStorage.setItem(NAME_KEY, nameInput.value); } catch (e) {}
+      });
+
+      function msg(text, kind) {
+        msgEl.textContent = text || "";
+        msgEl.className = "game-msg" + (kind ? " " + kind : "");
+      }
+
+      function tileAt(r, c) {
+        return rack.find((t) => t.at && t.at.r === r && t.at.c === c) || null;
+      }
+
+      function renderRack() {
+        rackEl.innerHTML = "";
+        for (const t of rack) {
+          if (t.at) continue; // placed tiles live on the board, not the rack
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "tile rack-tile" + (selected === t.id ? " selected" : "");
+          b.innerHTML = tileFace(t.letter);
+          b.addEventListener("click", () => {
+            selected = selected === t.id ? null : t.id;
+            render();
+          });
+          rackEl.appendChild(b);
+        }
+        if (!rackEl.children.length) {
+          const span = document.createElement("span");
+          span.className = "rack-empty";
+          span.textContent = "All tiles placed.";
+          rackEl.appendChild(span);
+        }
+      }
+
+      function tileFace(letter) {
+        const v = values[letter] != null ? values[letter] : "";
+        return '<span class="tile-letter">' + letter.toUpperCase() + "</span>" +
+               '<span class="tile-value">' + v + "</span>";
+      }
+
+      function renderGrid() {
+        gridEl.style.setProperty("--size", SIZE);
+        gridEl.innerHTML = "";
+        for (let r = 0; r < SIZE; r++) {
+          for (let c = 0; c < SIZE; c++) {
+            const cell = document.createElement("div");
+            cell.className = "cell";
+            const bonus = bonuses[r] && bonuses[r][c];
+            if (bonus) cell.classList.add("b-" + bonus);
+
+            const seedLetter = seed[r + "," + c];
+            const placed = tileAt(r, c);
+
+            if (seedLetter) {
+              cell.classList.add("filled", "seed");
+              cell.innerHTML = tileFace(seedLetter);
+            } else if (placed) {
+              cell.classList.add("filled", "placed");
+              cell.innerHTML = tileFace(placed.letter);
+              cell.setAttribute("role", "button");
+              cell.title = "Click to pick this tile back up";
+              cell.addEventListener("click", () => {
+                placed.at = null;
+                selected = placed.id;
+                render();
+              });
+            } else {
+              if (bonus) {
+                const tag = document.createElement("span");
+                tag.className = "bonus-tag";
+                tag.textContent = BONUS_LABEL[bonus];
+                cell.appendChild(tag);
+              }
+              cell.setAttribute("role", "button");
+              cell.addEventListener("click", () => {
+                if (!selected) return;
+                const t = rack.find((x) => x.id === selected);
+                if (!t) return;
+                t.at = { r, c };
+                selected = null;
+                render();
+              });
+            }
+            gridEl.appendChild(cell);
+          }
+        }
+      }
+
+      function render() {
+        renderGrid();
+        renderRack();
+        const placedCount = rack.filter((t) => t.at).length;
+        submitBtn.disabled = locked || placedCount === 0;
+      }
+
+      function currentPlacements() {
+        return rack
+          .filter((t) => t.at)
+          .map((t) => ({ letter: t.letter, row: t.at.r, col: t.at.c }));
+      }
+
+      recallBtn.addEventListener("click", () => {
+        for (const t of rack) t.at = null;
+        selected = null;
+        locked = false;
+        recallBtn.textContent = "Recall";
+        msg("");
+        render();
+      });
+
+      submitBtn.addEventListener("click", () => {
+        const placements = currentPlacements();
+        if (!placements.length) return;
+        submitBtn.disabled = true;
+        msg("Checking…");
+        fetch("/api/play", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: nameInput.value, placements }),
+        })
+          .then((r) => r.json().then((data) => ({ status: r.status, data })))
+          .then(({ status, data }) => {
+            if (status === 200 && data.ok) {
+              const words = (data.words || []).map((w) => w.text).join(", ");
+              msg(
+                "Scored " + data.score + " points" +
+                  (data.usedAll ? " (all tiles — bonus!)" : "") +
+                  (words ? " · " + words : "") +
+                  " — Recall to try a different word.",
+                "ok"
+              );
+              // The play is recorded. Each submission is scored independently, so
+              // leave the tiles shown and lock Submit until they recall.
+              selected = null;
+              locked = true;
+              recallBtn.textContent = "New word";
+              render();
+              if (window.refreshLeaderboard) window.refreshLeaderboard();
+            } else {
+              msg(data.detail || data.error || "That move isn't valid.", "err");
+              submitBtn.disabled = false;
+            }
+          })
+          .catch(() => {
+            msg("Couldn't reach the server. Try again.", "err");
+            submitBtn.disabled = false;
+          });
+      });
+
+      fetch("/api/puzzle")
         .then((r) => {
           if (!r.ok) throw new Error("HTTP " + r.status);
           return r.json();
         })
         .then((data) => {
-          dateEl.textContent = "Puzzle · " + data.date;
-          list.innerHTML = "";
-          for (const e of data.entries) {
-            const li = document.createElement("li");
-            li.className = "board-row";
-            li.innerHTML =
-              '<span class="board-name">' + e.name + "</span>" +
-              '<span class="board-score">' + e.score + "</span>";
-            list.appendChild(li);
+          SIZE = data.size;
+          bonuses = data.bonuses;
+          values = data.values;
+          seed = {};
+          for (const wd of data.words) {
+            for (let i = 0; i < wd.w.length; i++) {
+              const rr = wd.dir === "H" ? wd.r : wd.r + i;
+              const cc = wd.dir === "H" ? wd.c + i : wd.c;
+              seed[rr + "," + cc] = wd.w[i];
+            }
           }
+          rack = data.rack.map((letter, i) => ({ id: i, letter, at: null }));
+          sub.textContent =
+            "Place your tiles to build words off the board. Longer words and bonus squares score more.";
+          play.hidden = false;
+          render();
         })
         .catch(() => {
-          dateEl.textContent = "Leaderboard unavailable right now.";
+          sub.textContent = "Today's board isn't available right now.";
         });
     })();
   </script>

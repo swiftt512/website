@@ -15,6 +15,21 @@ CREATE TABLE IF NOT EXISTS leaderboard (
 CREATE INDEX IF NOT EXISTS idx_leaderboard_rank
   ON leaderboard (puzzle_date, score DESC, created_at ASC);
 
+-- ENABLE word list (public domain). Used by /api/play to validate every word
+-- formed on the board. word is lowercase; PRIMARY KEY gives an O(log n) lookup.
+-- Loaded from the generated dictionary.sql (derived from enable1.txt).
+CREATE TABLE IF NOT EXISTS dictionary (
+  word TEXT PRIMARY KEY
+);
+
+-- Pre-generated daily starting boards (2-3 interlocking words) + the day's rack.
+-- Built OFFLINE by tools/gen-puzzles.mjs (crossword search is not 10ms-safe) and
+-- seeded from data/puzzles.sql. data is JSON: {size, words:[{w,r,c,dir}], rack:[...]}.
+CREATE TABLE IF NOT EXISTS puzzles (
+  puzzle_date TEXT PRIMARY KEY,   -- YYYY-MM-DD, the US-Central puzzle day
+  data        TEXT NOT NULL       -- JSON board definition (no answer to leak)
+);
+
 -- Demo rows for today so the live page shows data before Step 4.
 -- Guarded so re-running this file never double-seeds.
 INSERT INTO leaderboard (puzzle_date, name, score, created_at)
