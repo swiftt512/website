@@ -43,13 +43,13 @@ body {
   font-size: 15px;
   line-height: 1.9;
   letter-spacing: 0.02em;
-  /* Blocky green pixel-arrow cursor (hotspot at the tip) */
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='32' viewBox='0 0 12 16'%3E%3Cpath d='M1 1 L1 14 L4 11 L6 15 L8 14.2 L6 10.5 L10 10.5 Z' fill='%235cba5f' stroke='%2316281a' stroke-width='1' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3C/svg%3E") 2 2, auto;
+  /* Green ring cursor with a center dot for precision (hotspot = center) */
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='6' fill='%235cba5f' fill-opacity='0.85' stroke='%2316281a' stroke-width='1.5'/%3E%3Ccircle cx='10' cy='10' r='1' fill='%2316281a'/%3E%3C/svg%3E") 10 10, auto;
 }
 
-/* Gold pixel-arrow on clickable things (keeps the "this is interactive" cue) */
+/* Gold ring on clickable things (keeps the "this is interactive" cue) */
 a, button, summary, label, .resume-btn, .modal-btn, [data-close] {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='32' viewBox='0 0 12 16'%3E%3Cpath d='M1 1 L1 14 L4 11 L6 15 L8 14.2 L6 10.5 L10 10.5 Z' fill='%23ffcf3f' stroke='%2316281a' stroke-width='1' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3C/svg%3E") 2 2, pointer;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='6' fill='%23ffcf3f' fill-opacity='0.9' stroke='%2316281a' stroke-width='1.5'/%3E%3Ccircle cx='10' cy='10' r='1' fill='%2316281a'/%3E%3C/svg%3E") 10 10, pointer;
 }
 
 .wrap {
@@ -81,7 +81,6 @@ a, button, summary, label, .resume-btn, .modal-btn, [data-close] {
   color: var(--accent-fg);
   border: 0;
   font: inherit;
-  cursor: pointer;
   text-decoration: none;
   font-weight: 600;
   padding: 0.75rem 1.4rem;
@@ -297,7 +296,6 @@ a, button, summary, label, .resume-btn, .modal-btn, [data-close] {
   background: transparent;
   color: var(--fg);
   text-decoration: none;
-  cursor: pointer;
   white-space: nowrap;
 }
 
