@@ -5,17 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nicklas Di Tirro</title>
   <meta name="description" content="Nicklas Di Tirro — Electrical &amp; Computer Engineering student at UT Austin. Résumé, projects, and a daily puzzle." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <main class="wrap">
     <header class="hero">
+      <div class="splash" aria-hidden="true"><span class="splash-inner" id="splash-inner"></span></div>
+
       <h1>Nicklas Di Tirro</h1>
       <p class="tagline">Electrical &amp; Computer Engineering @ UT Austin</p>
 
       <button class="resume-btn" type="button" id="resume-open" aria-haspopup="dialog">
-        <span aria-hidden="true">▤</span> View résumé
+        <span aria-hidden="true">▤</span> View Resume
       </button>
 
       <nav class="links" aria-label="Contact links">
@@ -47,7 +48,7 @@
     <div class="modal-backdrop" data-close></div>
     <div class="modal-panel" role="dialog" aria-modal="true" aria-label="Résumé preview">
       <div class="modal-bar">
-        <span class="modal-title">Résumé</span>
+        <span class="modal-title">Resume</span>
         <div class="modal-actions">
           <a class="modal-btn primary" href="/resume.pdf" download>↓ Download</a>
           <a class="modal-btn" href="/resume.pdf" target="_blank" rel="noopener">Open tab ↗</a>
@@ -60,7 +61,80 @@
     </div>
   </div>
 
+  <div class="cursor-trail" id="cursor-trail" aria-hidden="true"></div>
+
   <script>
+    // --- Splash text (loaded from /splashes.txt so the list is easy to edit) ---
+    (function () {
+      const el = document.getElementById("splash-inner");
+      const box = el.parentElement;
+
+      // Scale the text down (never up) so long splashes fit the tilted box.
+      function fit() {
+        el.style.setProperty("--fit", "1");
+        const avail = box.clientWidth;
+        const natural = el.scrollWidth;
+        if (natural > avail && natural > 0) {
+          el.style.setProperty("--fit", (avail / natural).toFixed(3));
+        }
+      }
+
+      function show(text) {
+        el.textContent = text;
+        fit();
+      }
+
+      fetch("/splashes.txt")
+        .then((r) => (r.ok ? r.text() : ""))
+        .then((raw) => {
+          const lines = raw.split("\n").map((s) => s.trim()).filter(Boolean);
+          if (!lines.length) return;
+
+          let i = Math.floor(Math.random() * lines.length);
+          show(lines[i]);
+
+          // Rotate to a fresh splash every few seconds.
+          if (lines.length > 1) {
+            setInterval(() => {
+              let next = i;
+              while (next === i) next = Math.floor(Math.random() * lines.length);
+              i = next;
+              show(lines[i]);
+            }, 4000);
+          }
+        })
+        .catch(() => {});
+
+      window.addEventListener("resize", fit);
+    })();
+
+    // --- Cursor trail: a soft green shadow that eases toward the pointer ---
+    (function () {
+      const trail = document.getElementById("cursor-trail");
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const fine = window.matchMedia("(pointer: fine)").matches;
+      if (reduce || !fine) { trail.remove(); return; }
+
+      trail.style.opacity = "0"; // stay hidden until the pointer first moves
+      let tx = window.innerWidth / 2, ty = window.innerHeight / 2;
+      let x = tx, y = ty;
+      let seen = false;
+
+      window.addEventListener("pointermove", (e) => {
+        tx = e.clientX; ty = e.clientY;
+        if (!seen) { seen = true; trail.style.opacity = ""; }
+      });
+
+      function loop() {
+        // The 0.18 easing factor is the "delay" — the shadow lags the cursor.
+        x += (tx - x) * 0.18;
+        y += (ty - y) * 0.18;
+        trail.style.transform = "translate(" + x + "px," + y + "px)";
+        requestAnimationFrame(loop);
+      }
+      requestAnimationFrame(loop);
+    })();
+
     // --- Résumé preview modal ---
     (function () {
       const modal = document.getElementById("resume-modal");

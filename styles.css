@@ -1,20 +1,31 @@
+@font-face {
+  font-family: "Minecraft";
+  src: url("/fonts/minecraft.woff2") format("woff2"),
+       url("/fonts/minecraft.woff") format("woff");
+  font-display: swap;
+}
+
 :root {
-  --bg: #fbfaf8;
-  --fg: #1a1a1a;
-  --muted: #6b6b6b;
-  --accent: #bf5700; /* UT Austin burnt orange */
-  --accent-fg: #ffffff;
-  --border: #e6e2dc;
+  --bg: #eef3ea;
+  --fg: #16281a;
+  --muted: #4f6b52;
+  --accent: #2e6d3a;      /* forest green */
+  --accent-fg: #f2f7ef;
+  --border: #cdddc6;
+  --splash: #d4a017;      /* muted gold, readable on light */
+  --splash-shadow: #7a5c00;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #16151a;
-    --fg: #ececec;
-    --muted: #9a9a9a;
-    --accent: #ff7a29;
-    --accent-fg: #16151a;
-    --border: #2a2830;
+    --bg: #0e1a12;        /* deep forest */
+    --fg: #dcead9;
+    --muted: #8aa88d;
+    --accent: #5cba5f;
+    --accent-fg: #0b1410;
+    --border: #223a28;
+    --splash: #ffff44;    /* classic Minecraft yellow */
+    --splash-shadow: #3f3f00;
   }
 }
 
@@ -28,8 +39,10 @@ html, body {
 body {
   background: var(--bg);
   color: var(--fg);
-  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  -webkit-font-smoothing: antialiased;
+  font-family: "Minecraft", "Courier New", monospace;
+  font-size: 15px;
+  line-height: 1.9;
+  letter-spacing: 0.02em;
 }
 
 .wrap {
@@ -38,11 +51,13 @@ body {
   padding: 12vh 24px 10vh;
 }
 
+.hero { position: relative; }
+
 .hero h1 {
-  font-size: clamp(2.2rem, 6vw, 3rem);
-  line-height: 1.1;
-  margin: 0 0 0.25rem;
-  letter-spacing: -0.02em;
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  line-height: 1.15;
+  margin: 0 0 0.5rem;
+  letter-spacing: 0;
 }
 
 .tagline {
@@ -97,6 +112,71 @@ body {
 }
 
 .bio p { margin: 0 0 1.1rem; }
+
+/* --- Minecraft splash text --- */
+.splash {
+  position: absolute;
+  top: -0.4rem;
+  right: 0;
+  width: 46%;
+  max-width: 260px;
+  text-align: center;
+  pointer-events: none;
+  transform: rotate(-14deg);
+  transform-origin: center;
+  z-index: 5;
+}
+
+.splash-inner {
+  display: inline-block;
+  color: var(--splash);
+  text-shadow: 2px 2px 0 var(--splash-shadow);
+  /* --fit is set by JS so long splashes shrink to fit the box */
+  font-size: calc(1.15rem * var(--fit, 1));
+  line-height: 1.1;
+  white-space: nowrap;
+  animation: splash-bob 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes splash-bob {
+  from { transform: scale(1); }
+  to   { transform: scale(1.08); }
+}
+
+@media (max-width: 560px) {
+  .splash {
+    position: static;
+    width: auto;
+    max-width: none;
+    margin: 0.5rem 0 1.25rem;
+    transform: rotate(-6deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-inner { animation: none; }
+}
+
+/* --- Cursor trail (soft green shadow that lags behind the pointer) --- */
+.cursor-trail {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 60;
+  mix-blend-mode: multiply;
+  will-change: transform;
+}
+
+@media (prefers-color-scheme: dark) {
+  .cursor-trail { mix-blend-mode: screen; opacity: 0.6; }
+}
 
 /* --- Leaderboard --- */
 .board {
