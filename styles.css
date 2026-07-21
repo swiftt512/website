@@ -1,0 +1,96 @@
+:root {
+  --bg: #fbfaf8;
+  --fg: #1a1a1a;
+  --muted: #6b6b6b;
+  --accent: #bf5700; /* UT Austin burnt orange */
+  --accent-fg: #ffffff;
+  --border: #e6e2dc;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16151a;
+    --fg: #ececec;
+    --muted: #9a9a9a;
+    --accent: #ff7a29;
+    --accent-fg: #16151a;
+    --border: #2a2830;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 12vh 24px 10vh;
+}
+
+.hero h1 {
+  font-size: clamp(2.2rem, 6vw, 3rem);
+  line-height: 1.1;
+  margin: 0 0 0.25rem;
+  letter-spacing: -0.02em;
+}
+
+.tagline {
+  color: var(--muted);
+  margin: 0 0 2rem;
+  font-size: 1.05rem;
+}
+
+.resume-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--accent);
+  color: var(--accent-fg);
+  text-decoration: none;
+  font-weight: 600;
+  padding: 0.75rem 1.4rem;
+  border-radius: 8px;
+  transition: transform 0.08s ease, opacity 0.15s ease;
+}
+
+.resume-btn:hover { opacity: 0.92; }
+.resume-btn:active { transform: translateY(1px); }
+.resume-btn:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.links {
+  margin-top: 1.25rem;
+  color: var(--muted);
+}
+
+.links a {
+  color: var(--fg);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+}
+
+.links a:hover { border-bottom-color: var(--accent); }
+
+.dot { margin: 0 0.6rem; color: var(--muted); }
+
+.bio {
+  margin-top: 3.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 2rem;
+  color: var(--fg);
+}
+
+.bio p { margin: 0 0 1.1rem; }
