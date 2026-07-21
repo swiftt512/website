@@ -14,9 +14,9 @@
       <h1>Nicklas Di Tirro</h1>
       <p class="tagline">Electrical &amp; Computer Engineering @ UT Austin</p>
 
-      <a class="resume-btn" href="/resume.pdf" download>
-        <span aria-hidden="true">↓</span> Download résumé
-      </a>
+      <button class="resume-btn" type="button" id="resume-open" aria-haspopup="dialog">
+        <span aria-hidden="true">▤</span> View résumé
+      </button>
 
       <nav class="links" aria-label="Contact links">
         <a href="mailto:njdt9758@gmail.com">Email</a>
@@ -28,16 +28,97 @@
     <section class="bio">
       <p>
         I'm a computer engineering student at the University of Texas at Austin
-        (B.S., May 2027), working across the stack from FPGAs and embedded
-        firmware to production LLM systems. Most recently I profiled and cut
-        input-token cost ~21% on a production inference pipeline at AmplifAI.
+        (B.S., May 2027).
       </p>
       <p>
-        I like building things end to end &mdash; a computer simulator from
-        scratch in C, an RFID jukebox streaming audio off an SD card, and this
-        site, which hosts a daily puzzle. More below soon.
+        yo.
       </p>
     </section>
+
+    <section class="board" aria-labelledby="board-heading">
+      <h2 id="board-heading">Daily puzzle leaderboard</h2>
+      <p class="board-sub" id="board-date">Loading…</p>
+      <ol class="board-list" id="board-list" aria-live="polite"></ol>
+    </section>
   </main>
+
+  <!-- Résumé preview modal -->
+  <div class="modal" id="resume-modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-label="Résumé preview">
+      <div class="modal-bar">
+        <span class="modal-title">Résumé</span>
+        <div class="modal-actions">
+          <a class="modal-btn primary" href="/resume.pdf" download>↓ Download</a>
+          <a class="modal-btn" href="/resume.pdf" target="_blank" rel="noopener">Open tab ↗</a>
+          <button class="modal-btn close" type="button" data-close aria-label="Close preview">✕</button>
+        </div>
+      </div>
+      <div class="modal-doc">
+        <iframe id="resume-frame" title="Résumé PDF preview" src="about:blank"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Résumé preview modal ---
+    (function () {
+      const modal = document.getElementById("resume-modal");
+      const frame = document.getElementById("resume-frame");
+      const openBtn = document.getElementById("resume-open");
+      let lastFocus = null;
+
+      function open() {
+        lastFocus = document.activeElement;
+        // Load the PDF only when opening (native viewer = scroll + zoom for free).
+        if (frame.getAttribute("src") === "about:blank") {
+          frame.setAttribute("src", "/resume.pdf#view=FitH");
+        }
+        modal.hidden = false;
+        document.body.style.overflow = "hidden";
+        modal.querySelector(".close").focus();
+      }
+      function close() {
+        modal.hidden = true;
+        document.body.style.overflow = "";
+        if (lastFocus) lastFocus.focus();
+      }
+
+      openBtn.addEventListener("click", open);
+      modal.addEventListener("click", (e) => {
+        if (e.target.hasAttribute("data-close")) close();
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && !modal.hidden) close();
+      });
+    })();
+
+    // --- Leaderboard (Step 2: fetch same-origin /api/leaderboard) ---
+    (function () {
+      const list = document.getElementById("board-list");
+      const dateEl = document.getElementById("board-date");
+
+      fetch("/api/leaderboard")
+        .then((r) => {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })
+        .then((data) => {
+          dateEl.textContent = "Puzzle · " + data.date;
+          list.innerHTML = "";
+          for (const e of data.entries) {
+            const li = document.createElement("li");
+            li.className = "board-row";
+            li.innerHTML =
+              '<span class="board-name">' + e.name + "</span>" +
+              '<span class="board-score">' + e.score + "</span>";
+            list.appendChild(li);
+          }
+        })
+        .catch(() => {
+          dateEl.textContent = "Leaderboard unavailable right now.";
+        });
+    })();
+  </script>
 </body>
 </html>
