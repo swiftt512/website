@@ -90,18 +90,8 @@
           const lines = raw.split("\n").map((s) => s.trim()).filter(Boolean);
           if (!lines.length) return;
 
-          let i = Math.floor(Math.random() * lines.length);
-          show(lines[i]);
-
-          // Rotate to a fresh splash every few seconds.
-          if (lines.length > 1) {
-            setInterval(() => {
-              let next = i;
-              while (next === i) next = Math.floor(Math.random() * lines.length);
-              i = next;
-              show(lines[i]);
-            }, 4000);
-          }
+          // Pick one splash per page load (changes only on reload).
+          show(lines[Math.floor(Math.random() * lines.length)]);
         })
         .catch(() => {});
 
