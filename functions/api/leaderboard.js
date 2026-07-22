@@ -4,7 +4,7 @@ import { centralDate } from "../lib/central-time.js";
 // Reads today's leaderboard from D1 (binding: env.DB).
 // Ranking contract: score DESC, tiebreak earliest created_at (never by
 // elapsed time). Read-only and public. Each entry also carries the placements
-// that earned the score, so the board can replay another player's word — the
+// that earned the score, so the board can replay another player's word. The
 // frontend gates that behind a "this locks your own submission" warning.
 export async function onRequestGet({ env }) {
   const date = centralDate();
@@ -35,7 +35,7 @@ export async function onRequestGet({ env }) {
   }
 }
 
-// Old rows (and the demo seed) have no placements — return null so the client
+// Old rows (and the demo seed) have no placements; return null so the client
 // simply omits the "view" button for them.
 function parsePlacements(raw) {
   if (typeof raw !== "string" || !raw) return null;

@@ -1,7 +1,7 @@
 -- D1 schema for the daily-puzzle leaderboard.
 -- Ranking contract: within a puzzle_date, order by score DESC, then earliest
 -- created_at (never by elapsed play time). Writes come later from the verified
--- /api/play endpoint (Step 4) — this file only sets up structure + demo data.
+-- /api/play endpoint (Step 4); this file only sets up structure + demo data.
 
 CREATE TABLE IF NOT EXISTS leaderboard (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,

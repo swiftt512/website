@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nicklas Di Tirro</title>
-  <meta name="description" content="Nicklas Di Tirro — Electrical &amp; Computer Engineering student at UT Austin. Résumé, projects, and a daily puzzle." />
+  <meta name="description" content="Nicklas Di Tirro, Electrical &amp; Computer Engineering student at UT Austin. Résumé, projects, and a daily puzzle." />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -37,11 +37,12 @@
     </section>
 
     <section class="game" aria-labelledby="game-heading">
-      <h2 id="game-heading">Daily word board</h2>
+      <h2 id="game-heading">woah original and new word game</h2>
+      <p class="game-once">One word a day, one line on the board. Resubmit as often as you like; only your best score sticks.</p>
       <p class="game-sub" id="game-sub">Loading today's board…</p>
 
       <div class="game-play" id="game-play" hidden>
-        <div class="game-status idle" id="game-status" role="status" aria-live="polite">Drag tiles onto the board to build a word.</div>
+        <div class="game-status idle" id="game-status" role="status" aria-live="polite">Drag tiles onto the board to build your one word for today.</div>
 
         <div class="board-grid" id="board-grid" role="grid" aria-label="Word board"></div>
 
@@ -233,7 +234,7 @@
     // --- Daily word board game ---
     //     Loads today's board from /api/puzzle, lets the player DRAG rack tiles
     //     onto the board, and submits placements to /api/play. The server both
-    //     scores and validates every word — the client never computes a score.
+    //     scores and validates every word; the client never computes a score.
     //     A live status line calls /api/preview (read-only, server-scored) so the
     //     current word's validity + points are always shown without cheating.
     (function () {
@@ -462,7 +463,7 @@
           selected = null;
           changed();
         } else {
-          // Dropped on nothing useful — leave the tile where it started.
+          // Dropped on nothing useful; leave the tile where it started.
           render();
         }
       }
@@ -491,7 +492,7 @@
         if (!placements.length) {
           setStatus(
             peekLocked
-              ? "You viewed another player's word — submissions are locked for today."
+              ? "You viewed another player's word. Submissions are locked for today."
               : "Drag tiles onto the board to build a word.",
             peekLocked ? "err" : "idle"
           );
@@ -510,12 +511,12 @@
             if (data.ok && data.valid) {
               const words = (data.words || []).map((w) => w.text).join(", ");
               setStatus(
-                "✔ " + words + " · " + data.score + " point" + (data.score === 1 ? "" : "s") +
-                  (data.usedAll ? " — all tiles bonus!" : ""),
+                "Valid: " + words + " · " + data.score + " point" + (data.score === 1 ? "" : "s") +
+                  (data.usedAll ? " (all tiles bonus!)" : ""),
                 "ok"
               );
             } else {
-              setStatus("✘ " + (data.detail || "Not a valid word yet."), "err");
+              setStatus((data.detail || "Not a valid word yet."), "err");
             }
           })
           .catch(() => {
@@ -547,13 +548,21 @@
           .then(({ status, data }) => {
             if (status === 200 && data.ok) {
               const words = (data.words || []).map((w) => w.text).join(", ");
-              msg(
-                "Recorded " + data.score + " point" + (data.score === 1 ? "" : "s") +
-                  (words ? " · " + words : "") + " — Recall to try a different word.",
-                "ok"
-              );
-              // Recorded. Each submission is scored independently, so leave the
-              // tiles shown and lock Submit until they recall.
+              if (data.improved) {
+                msg(
+                  "Recorded " + data.score + " point" + (data.score === 1 ? "" : "s") +
+                    (words ? " · " + words : "") + ". That's your best today. Recall to try to beat it.",
+                  "ok"
+                );
+              } else {
+                msg(
+                  "That word scored " + data.score + " point" + (data.score === 1 ? "" : "s") +
+                    ", under your best of " + data.best + " today, so your board line stays put.",
+                  "ok"
+                );
+              }
+              // Recorded. Only your best score keeps a line on the board, so leave
+              // the tiles shown and lock Submit until they recall.
               selected = null;
               submitted = true;
               hasSubmitted = true;
@@ -573,14 +582,14 @@
 
       // Replay another player's word onto the board. If the viewer hasn't
       // submitted yet, this locks their board for the day (with a warning) so
-      // they can't just copy a top score — the anti-cheat trade for peeking.
+      // they can't just copy a top score; the anti-cheat trade for peeking.
       function viewEntry(placements, who) {
         if (!Array.isArray(placements) || !placements.length) return;
         if (!hasSubmitted && !peekLocked) {
           const ok = window.confirm(
             "Show " + (who || "this player") + "'s word?\n\n" +
               "You haven't submitted your own word yet, so viewing another " +
-              "player's solution will LOCK your board for today — you won't be " +
+              "player's solution will LOCK your board for today. You won't be " +
               "able to submit a score. Continue?"
           );
           if (!ok) return;
@@ -599,7 +608,7 @@
         msg("");
         render();
         setStatus(
-          "Viewing " + (who || "player") + "'s word (" + placements.length + " tiles) — board locked.",
+          "Viewing " + (who || "player") + "'s word (" + placements.length + " tiles). Board locked.",
           "view"
         );
         gridEl.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -630,10 +639,10 @@
           }
           rack = data.rack.map((letter, i) => ({ id: i, letter, at: null }));
           sub.textContent =
-            "Drag your tiles onto the board to build words off the existing letters. Longer words and bonus squares score more.";
+            "Drag your tiles onto the board to build a single word off the existing letters. Longer words and bonus squares score more. Recall and resubmit as many times as you want; the board only keeps your best score.";
           play.hidden = false;
           render();
-          setStatus("Drag tiles onto the board to build a word.", "idle");
+          setStatus("Drag tiles onto the board to build your one word for today.", "idle");
         })
         .catch(() => {
           sub.textContent = "Today's board isn't available right now.";

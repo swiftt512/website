@@ -1,6 +1,6 @@
 // Shared board constants + today's-puzzle loader.
 //
-// The board geometry (size + premium squares) is FIXED — like a real Scrabble
+// The board geometry (size + premium squares) is FIXED, like a real Scrabble
 // board, only the tiles change day to day. The daily starting words + rack come
 // from the pre-generated `puzzles` table (see tools/gen-puzzles.mjs). Both
 // /api/puzzle (display) and /api/play (verification) import from here so they

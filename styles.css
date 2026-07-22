@@ -175,7 +175,7 @@ body.custom-cursor, body.custom-cursor * { cursor: none; }
   z-index: 60;
   mix-blend-mode: multiply;
   will-change: transform;
-  /* Only size/brightness animate — position is set instantly so there's no drag. */
+  /* Only size/brightness animate; position is set instantly so there's no drag. */
   transition: width 0.12s ease, height 0.12s ease, margin 0.12s ease,
               opacity 0.12s ease, background 0.12s ease;
 }
@@ -271,28 +271,27 @@ body.custom-cursor, body.custom-cursor * { cursor: none; }
 }
 
 /* --- Daily word board game ---
-   Deliberately its own look: Minecraft-pig pink + Comic Sans. All the game
+   Its own pale-purple look (shares the site's Minecraft font). All the game
    rules below use the palette vars, so re-pointing them here re-themes the
    whole board without touching the rest of the (green) site. */
 .game {
   margin-top: 3rem;
   padding: 1.5rem 1.4rem 1.75rem;
   border-radius: 16px;
-  font-family: "Comic Sans MS", "Comic Sans", "Chalkboard SE", "Comic Neue", cursive;
 
-  /* Minecraft pig palette, scoped to the game box. */
-  --bg: #ffe9f1;              /* cell / input base */
-  --fg: #6d243f;             /* text */
-  --muted: #b06983;
-  --accent: #e06a97;         /* pig snout pink — buttons, valid word, rack tiles */
-  --accent-fg: #fff5f9;
-  --border: #f4a6c2;
-  --splash: #ff9ec2;         /* bright pig pink — your placed tiles */
-  --splash-shadow: #8a2f52;
+  /* Pale purple palette, scoped to the game box. */
+  --bg: #f2ecfb;             /* cell / input base */
+  --fg: #45356b;             /* text */
+  --muted: #8a7bb0;
+  --accent: #8f6fd6;         /* soft purple: buttons, valid word, rack tiles */
+  --accent-fg: #fbf9ff;
+  --border: #d3c4ef;
+  --splash: #b79bec;         /* brighter lavender: your placed tiles */
+  --splash-shadow: #4a3183;
 
-  background: #ffd6e4;        /* pig-pink card */
+  background: #ece2fb;        /* pale purple card */
   border: 2px solid var(--border);
-  box-shadow: 0 6px 0 #f2a7c1, 0 8px 24px rgba(138, 47, 82, 0.18);
+  box-shadow: 0 6px 0 #dccdf3, 0 8px 24px rgba(74, 49, 131, 0.16);
 }
 
 .game h2 {
@@ -302,7 +301,17 @@ body.custom-cursor, body.custom-cursor * { cursor: none; }
   color: var(--fg);
 }
 
-.game h2::before { content: "🐷 "; }
+/* One-word-a-day notice, hard to miss. */
+.game-once {
+  margin: 0 0 0.9rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: 10px;
+  border: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, #fff);
+  color: var(--fg);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
 
 .game-sub {
   color: var(--muted);
@@ -369,7 +378,7 @@ body.custom-cursor, body.custom-cursor * { cursor: none; }
   aspect-ratio: 1;
 }
 
-/* Premium squares (empty) — tinted by type. */
+/* Premium squares (empty), tinted by type. */
 .cell.b-dl { background: color-mix(in srgb, var(--accent) 16%, var(--bg)); }
 .cell.b-tl { background: color-mix(in srgb, var(--accent) 30%, var(--bg)); }
 .cell.b-dw { background: color-mix(in srgb, var(--splash) 22%, var(--bg)); }
@@ -382,7 +391,7 @@ body.custom-cursor, body.custom-cursor * { cursor: none; }
   opacity: 0.85;
 }
 
-/* A tile — used both on the board (filled cells) and in the rack. */
+/* A tile: used both on the board (filled cells) and in the rack. */
 .tile,
 .cell.filled {
   position: relative;
@@ -395,7 +404,7 @@ body.custom-cursor, body.custom-cursor * { cursor: none; }
 
 .cell.filled { border-radius: 3px; }
 
-/* Seed tiles (pre-placed) read as the board's given letters — muted vs. yours. */
+/* Seed tiles (pre-placed) read as the board's given letters, muted vs. yours. */
 .cell.seed {
   background: color-mix(in srgb, var(--accent) 62%, var(--fg) 8%);
 }

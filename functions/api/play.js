@@ -5,11 +5,11 @@ import { analyzePlay } from "../lib/scoring.js";
 // POST /api/play
 // Body: { name, placements: [{ letter, row, col }] }
 //
-// The client submits ONLY where it placed tiles — never a score. The server
+// The client submits ONLY where it placed tiles, never a score. The server
 // loads today's puzzle, independently checks the move is legal (tiles came from
 // the rack, form contiguous connected words), validates every word against the
 // ENABLE dictionary in D1, and computes the score itself. A client-supplied
-// score field, if present, is ignored on purpose — never trust it.
+// score field, if present, is ignored on purpose; never trust it.
 export async function onRequestPost({ env, request }) {
   const date = centralDate();
 
@@ -53,18 +53,53 @@ export async function onRequestPost({ env, request }) {
     );
   }
 
-  // Legal move — record the server-computed score. We also store the placements
+  // Legal move: record the server-computed score. We also store the placements
   // (already validated above) so the leaderboard can replay this word onto the
   // board for other players. It's the player's own move, not a hidden answer.
   const createdAt = new Date().toISOString();
   const stored = JSON.stringify(
     placements.map((p) => ({ letter: String(p.letter).toLowerCase(), row: p.row, col: p.col }))
   );
+
+  // One line per player per day: keep only their best score. Look up any row(s)
+  // this name already has today; update the best-scoring one in place if this
+  // play beats it, and collapse any leftover duplicates from earlier behavior.
+  let existing;
   try {
-    await env.DB
-      .prepare("INSERT INTO leaderboard (puzzle_date, name, score, created_at, placements) VALUES (?, ?, ?, ?, ?)")
-      .bind(date, name, analysis.score, createdAt, stored)
-      .run();
+    existing = await env.DB
+      .prepare(
+        "SELECT id, score FROM leaderboard WHERE puzzle_date = ? AND name = ? ORDER BY score DESC, created_at ASC"
+      )
+      .bind(date, name)
+      .all();
+  } catch {
+    return json({ error: "save_failed" }, 500);
+  }
+
+  const rows = existing.results || [];
+  const prevBest = rows.length ? rows[0].score : null;
+  const improved = prevBest == null || analysis.score > prevBest;
+
+  try {
+    if (rows.length) {
+      // Drop any extra rows so the player occupies exactly one line.
+      if (rows.length > 1) {
+        const extra = rows.slice(1).map((r) => r.id);
+        const ph = extra.map(() => "?").join(",");
+        await env.DB.prepare(`DELETE FROM leaderboard WHERE id IN (${ph})`).bind(...extra).run();
+      }
+      if (improved) {
+        await env.DB
+          .prepare("UPDATE leaderboard SET score = ?, created_at = ?, placements = ? WHERE id = ?")
+          .bind(analysis.score, createdAt, stored, rows[0].id)
+          .run();
+      }
+    } else {
+      await env.DB
+        .prepare("INSERT INTO leaderboard (puzzle_date, name, score, created_at, placements) VALUES (?, ?, ?, ?, ?)")
+        .bind(date, name, analysis.score, createdAt, stored)
+        .run();
+    }
   } catch {
     return json({ error: "save_failed" }, 500);
   }
@@ -74,6 +109,8 @@ export async function onRequestPost({ env, request }) {
     date,
     name,
     score: analysis.score,
+    best: improved ? analysis.score : prevBest,
+    improved,
     usedAll: analysis.usedAll,
     words: analysis.words.map((w) => ({ text: w.text.toUpperCase() })),
   });

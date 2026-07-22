@@ -4,7 +4,7 @@ import { getDailyPuzzle, SIZE, BONUSES, LETTER_VALUES } from "../lib/puzzle.js";
 // GET /api/puzzle
 // Serves today's starting board: fixed geometry (size + premium squares),
 // the 2-3 pre-placed interlocking words, and the day's rack. Everything here
-// is meant to be visible to the player — the game is open-ended, so there is no
+// is meant to be visible to the player; the game is open-ended, so there is no
 // hidden "answer" or optimal score to leak. Scoring happens only in /api/play.
 export async function onRequestGet({ env }) {
   const date = centralDate();

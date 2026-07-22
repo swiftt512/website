@@ -8,7 +8,7 @@ import { analyzePlay } from "../lib/scoring.js";
 // Same verification as /api/play, but READ-ONLY: it never writes to the
 // leaderboard. It exists so the board can always show the current move's score
 // and validity without the client ever computing a score itself. The server is
-// still the only thing that scores or judges a word — this endpoint just reports
+// still the only thing that scores or judges a word; this endpoint just reports
 // the result of the tiles the player has already placed (never an "answer" or an
 // optimal move), so it leaks nothing a determined player couldn't get by
 // submitting. No name, no side effects.
@@ -57,7 +57,7 @@ export async function onRequestPost({ env, request }) {
     }, 200);
   }
 
-  // Legal, all-real move — report the score, but record nothing.
+  // Legal, all-real move: report the score, but record nothing.
   return json({
     ok: true,
     valid: true,

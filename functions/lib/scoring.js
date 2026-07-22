@@ -15,7 +15,7 @@ const err = (error, detail) => ({ ok: false, error, detail });
 const key = (r, c) => r + "," + c;
 
 // analyzePlay(puzzle, placements)
-//   placements: [{ letter, row, col }] — letters a-z, coords 0..SIZE-1.
+//   placements: [{ letter, row, col }], letters a-z, coords 0..SIZE-1.
 // Returns { ok:false, error, detail } on any illegal move, otherwise
 //   { ok:true, words:[{ text, cells }], score, usedAll } where `words` still
 //   needs each `text` confirmed against the dictionary by the caller.
