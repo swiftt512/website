@@ -42,7 +42,7 @@
       <div class="win-bar">
         <span class="win-dots" aria-hidden="true"><i></i><i></i><i></i></span>
         <h2 class="win-title" id="game-heading">woah original and new word game</h2>
-        <button class="win-min" id="win-min" type="button" aria-label="Minimize game" title="Minimize">_</button>
+        <button class="win-min" id="win-min" type="button" aria-label="Minimize game" title="Minimize"></button>
       </div>
 
       <div class="win-body">
@@ -785,7 +785,6 @@
 
       minBtn.addEventListener("click", () => {
         const min = win.classList.toggle("minimized");
-        minBtn.textContent = min ? "+" : "_";
         minBtn.setAttribute("aria-label", min ? "Expand game" : "Minimize game");
         minBtn.title = min ? "Expand" : "Minimize";
         window.gameMinimized = min;
