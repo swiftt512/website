@@ -38,8 +38,6 @@
 
     <section class="game" aria-labelledby="game-heading">
       <h2 id="game-heading">woah original and new word game</h2>
-      <p class="game-once">One word a day, one line on the board. Resubmit as often as you like; only your best score sticks.</p>
-      <p class="game-sub" id="game-sub">Loading today's board…</p>
 
       <div class="game-play" id="game-play" hidden>
         <div class="game-status idle" id="game-status" role="status" aria-live="polite">Drag tiles onto the board to build your one word for today.</div>
@@ -238,7 +236,6 @@
     //     A live status line calls /api/preview (read-only, server-scored) so the
     //     current word's validity + points are always shown without cheating.
     (function () {
-      const sub = document.getElementById("game-sub");
       const play = document.getElementById("game-play");
       const gridEl = document.getElementById("board-grid");
       const rackEl = document.getElementById("rack");
@@ -638,14 +635,13 @@
             }
           }
           rack = data.rack.map((letter, i) => ({ id: i, letter, at: null }));
-          sub.textContent =
-            "Drag your tiles onto the board to build a single word off the existing letters. Longer words and bonus squares score more. Recall and resubmit as many times as you want; the board only keeps your best score.";
           play.hidden = false;
           render();
           setStatus("Drag tiles onto the board to build your one word for today.", "idle");
         })
         .catch(() => {
-          sub.textContent = "Today's board isn't available right now.";
+          play.hidden = false;
+          setStatus("Today's board isn't available right now.", "err");
         });
     })();
   </script>

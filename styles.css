@@ -301,24 +301,6 @@ body.custom-cursor, body.custom-cursor * { cursor: none; }
   color: var(--fg);
 }
 
-/* One-word-a-day notice, hard to miss. */
-.game-once {
-  margin: 0 0 0.9rem;
-  padding: 0.55rem 0.8rem;
-  border-radius: 10px;
-  border: 2px solid var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, #fff);
-  color: var(--fg);
-  font-size: 0.92rem;
-  font-weight: 700;
-}
-
-.game-sub {
-  color: var(--muted);
-  font-size: 0.9rem;
-  margin: 0 0 1.1rem;
-}
-
 /* Always-on, server-computed score/validity of the current word. */
 .game-status {
   font-weight: 700;
