@@ -36,8 +36,24 @@ html, body {
   padding: 0;
 }
 
+/* html keeps the flat fallback colour; the animated canvas paints over it when
+   WebGL is available, and the body is transparent so the canvas shows through. */
+html { background: var(--bg); }
+
+/* Animated 3D-ish background: a full-screen WebGL canvas pinned behind
+   everything. Falls back to the html background colour if it can't run. */
+#bg3d {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  display: block;
+  pointer-events: none;
+}
+
 body {
-  background: var(--bg);
+  background: transparent;
   color: var(--fg);
   font-family: "Minecraft", "Courier New", monospace;
   font-size: 15px;
@@ -270,14 +286,14 @@ body.custom-cursor, body.custom-cursor * { cursor: none; }
   color: var(--accent);
 }
 
-/* --- Daily word board game ---
+/* --- Daily word board game (an embedded window card) ---
    Its own pale-purple look (shares the site's Minecraft font). All the game
    rules below use the palette vars, so re-pointing them here re-themes the
    whole board without touching the rest of the (green) site. */
 .game {
   margin-top: 3rem;
-  padding: 1.5rem 1.4rem 1.75rem;
-  border-radius: 16px;
+  border-radius: 14px;
+  overflow: hidden;
 
   /* Pale purple palette, scoped to the game box. */
   --bg: #f2ecfb;             /* cell / input base */
@@ -294,12 +310,34 @@ body.custom-cursor, body.custom-cursor * { cursor: none; }
   box-shadow: 0 6px 0 #dccdf3, 0 8px 24px rgba(74, 49, 131, 0.16);
 }
 
-.game h2 {
-  font-size: 1.3rem;
-  margin: 0 0 0.25rem;
-  letter-spacing: 0;
-  color: var(--fg);
+/* Title bar: the window's header, purely decorative chrome. */
+.win-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--accent);
+  color: var(--accent-fg);
+  user-select: none;
 }
+.win-dots { display: inline-flex; gap: 5px; flex: none; }
+.win-dots i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent-fg) 65%, transparent);
+}
+.win-title {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0;
+  color: var(--accent-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.win-body { padding: 1.4rem 1.4rem 1.6rem; }
 
 /* Always-on, server-computed score/validity of the current word. */
 .game-status {

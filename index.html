@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
+  <canvas id="bg3d" aria-hidden="true"></canvas>
+
   <main class="wrap">
     <header class="hero">
       <div class="splash" aria-hidden="true"><span class="splash-inner" id="splash-inner"></span></div>
@@ -37,23 +39,28 @@
     </section>
 
     <section class="game" aria-labelledby="game-heading">
-      <h2 id="game-heading">woah original and new word game</h2>
+      <div class="win-bar">
+        <span class="win-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <h2 class="win-title" id="game-heading">woah original and new word game</h2>
+      </div>
 
-      <div class="game-play" id="game-play" hidden>
-        <div class="game-status idle" id="game-status" role="status" aria-live="polite">Drag tiles onto the board to build your one word for today.</div>
+      <div class="win-body">
+        <div class="game-play" id="game-play" hidden>
+          <div class="game-status idle" id="game-status" role="status" aria-live="polite">Drag tiles onto the board to build your one word for today.</div>
 
-        <div class="board-grid" id="board-grid" role="grid" aria-label="Word board"></div>
+          <div class="board-grid" id="board-grid" role="grid" aria-label="Word board"></div>
 
-        <div class="rack" id="rack" aria-label="Your tiles"></div>
+          <div class="rack" id="rack" aria-label="Your tiles"></div>
 
-        <div class="game-controls">
-          <input class="name-input" id="name-input" type="text" maxlength="12"
-                 placeholder="Your name" aria-label="Your name" autocomplete="off" spellcheck="false" />
-          <button class="game-btn" type="button" id="recall-btn">Recall</button>
-          <button class="game-btn primary" type="button" id="submit-btn">Submit word</button>
+          <div class="game-controls">
+            <input class="name-input" id="name-input" type="text" maxlength="12"
+                   placeholder="Your name" aria-label="Your name" autocomplete="off" spellcheck="false" />
+            <button class="game-btn" type="button" id="recall-btn">Recall</button>
+            <button class="game-btn primary" type="button" id="submit-btn">Submit word</button>
+          </div>
+
+          <p class="game-msg" id="game-msg" aria-live="polite"></p>
         </div>
-
-        <p class="game-msg" id="game-msg" aria-live="polite"></p>
       </div>
     </section>
 
@@ -643,6 +650,118 @@
           play.hidden = false;
           setStatus("Today's board isn't available right now.", "err");
         });
+    })();
+
+    // --- Animated 3D-ish background (raw WebGL, no libraries) ---
+    //     A full-screen quad runs a fragment shader that projects a few
+    //     rotating layers of glowing dots at different depths, so they drift
+    //     toward the viewer with parallax. Subtle and palette-tinted so text
+    //     stays readable; freezes on prefers-reduced-motion; pauses when the
+    //     tab is hidden; and quietly bows out (flat colour) if WebGL is absent.
+    (function () {
+      const canvas = document.getElementById("bg3d");
+      if (!canvas) return;
+      let gl;
+      try {
+        gl = canvas.getContext("webgl", { antialias: false, alpha: false }) ||
+             canvas.getContext("experimental-webgl");
+      } catch (e) { gl = null; }
+      if (!gl) { canvas.remove(); return; }
+
+      const vs = "attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }";
+      const fs = [
+        "precision mediump float;",
+        "uniform vec2 uRes; uniform float uTime; uniform vec3 uBase; uniform vec3 uGlow;",
+        "mat2 rot(float a){ return mat2(cos(a), -sin(a), sin(a), cos(a)); }",
+        "void main(){",
+        "  vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;",
+        "  vec3 col = uBase;",
+        "  for (int i = 0; i < 5; i++) {",
+        "    float fi = float(i);",
+        "    float z = fract(uTime * 0.05 + fi * 0.2);",   // depth, wraps 0..1
+        "    float depth = mix(5.5, 0.35, z);",            // far -> near
+        "    vec2 pp = rot(fi * 1.6 + uTime * 0.03) * (uv * depth);",
+        "    vec2 g = fract(pp) - 0.5;",
+        "    float glow = smoothstep(0.32, 0.0, length(g));",
+        "    float fade = smoothstep(0.0, 0.2, z) * smoothstep(1.0, 0.75, z);",
+        "    col += uGlow * glow * fade * (0.35 / depth);",
+        "  }",
+        "  gl_FragColor = vec4(col, 1.0);",
+        "}"
+      ].join("\n");
+
+      function compile(type, src) {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        return s;
+      }
+      const prog = gl.createProgram();
+      gl.attachShader(prog, compile(gl.VERTEX_SHADER, vs));
+      gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fs));
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { canvas.remove(); return; }
+      gl.useProgram(prog);
+
+      const buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      const pLoc = gl.getAttribLocation(prog, "p");
+      gl.enableVertexAttribArray(pLoc);
+      gl.vertexAttribPointer(pLoc, 2, gl.FLOAT, false, 0, 0);
+
+      const uRes = gl.getUniformLocation(prog, "uRes");
+      const uTime = gl.getUniformLocation(prog, "uTime");
+      const uBase = gl.getUniformLocation(prog, "uBase");
+      const uGlow = gl.getUniformLocation(prog, "uGlow");
+
+      const darkMq = window.matchMedia("(prefers-color-scheme: dark)");
+      function palette() {
+        if (darkMq.matches) {
+          gl.uniform3f(uBase, 0.055, 0.102, 0.071);  // deep forest
+          gl.uniform3f(uGlow, 0.36, 0.73, 0.37);
+        } else {
+          gl.uniform3f(uBase, 0.933, 0.953, 0.918);  // pale sage
+          gl.uniform3f(uGlow, 0.20, 0.45, 0.26);
+        }
+      }
+
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      function resize() {
+        const w = Math.max(1, Math.floor(window.innerWidth * dpr));
+        const h = Math.max(1, Math.floor(window.innerHeight * dpr));
+        canvas.width = w;
+        canvas.height = h;
+        gl.viewport(0, 0, w, h);
+        gl.uniform2f(uRes, w, h);
+      }
+      resize();
+      palette();
+      window.addEventListener("resize", resize);
+      (darkMq.addEventListener
+        ? darkMq.addEventListener.bind(darkMq, "change")
+        : darkMq.addListener.bind(darkMq))(palette);
+
+      // Reduced motion: draw a single static frame and stop.
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        gl.uniform1f(uTime, 8.0);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        return;
+      }
+
+      const start = performance.now();
+      let running = true;
+      function frame(now) {
+        if (!running) return;
+        gl.uniform1f(uTime, (now - start) / 1000);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) { running = false; }
+        else if (!running) { running = true; requestAnimationFrame(frame); }
+      });
     })();
   </script>
 </body>
