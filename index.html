@@ -66,7 +66,7 @@
     </section>
 
     <section class="board" aria-labelledby="board-heading">
-      <h2 id="board-heading">Daily puzzle leaderboard</h2>
+      <h2 id="board-heading">Top scores today</h2>
       <p class="board-sub" id="board-date">Loading…</p>
       <ol class="board-list" id="board-list" aria-live="polite"></ol>
     </section>
@@ -201,7 +201,7 @@
             return r.json();
           })
           .then((data) => {
-            dateEl.textContent = "Puzzle · " + data.date;
+            dateEl.textContent = data.date;
             list.innerHTML = "";
             for (const e of data.entries) {
               const li = document.createElement("li");
