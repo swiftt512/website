@@ -214,6 +214,54 @@ body.custom-cursor, body.custom-cursor * { cursor: none; }
   .cursor-trail { transition: none; }
 }
 
+/* --- Brick easter egg + "pointing girl" cursor --- */
+.brick {
+  position: fixed;
+  bottom: 18px;
+  left: 18px;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  background: url("/brick.png") center / contain no-repeat;
+  image-rendering: pixelated;      /* keep the blocky Minecraft look */
+  cursor: pointer;
+  z-index: 45;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.35));
+  animation: brick-bob 1.4s ease-in-out infinite alternate;
+}
+.brick:hover { transform: scale(1.12); }
+.brick:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+@keyframes brick-bob {
+  from { translate: 0 0; }
+  to   { translate: 0 -5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brick { animation: none; }
+}
+
+/* The photo cursor: pinned to the page, follows the pointer via JS, and never
+   eats clicks (so the click lands wherever the fingertip is drawn). */
+.girl-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  display: none;
+  height: auto;
+  pointer-events: none;
+  z-index: 9999;
+  will-change: transform;
+  user-select: none;
+}
+
+/* While the photo cursor is on: hide the native pointer and the glow orb,
+   and show the girl. */
+body.girl-active { cursor: none; }
+body.girl-active .cursor-trail { display: none; }
+body.girl-active .girl-cursor { display: block; }
+
 /* --- Leaderboard --- */
 .board {
   margin-top: 3rem;
@@ -310,7 +358,7 @@ body.custom-cursor, body.custom-cursor * { cursor: none; }
   box-shadow: 0 6px 0 #dccdf3, 0 8px 24px rgba(74, 49, 131, 0.16);
 }
 
-/* Title bar: the window's header, purely decorative chrome. */
+/* Title bar: the window's header, with a minimize/expand button. */
 .win-bar {
   display: flex;
   align-items: center;
@@ -337,7 +385,23 @@ body.custom-cursor, body.custom-cursor * { cursor: none; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.win-min {
+  flex: none;
+  width: 1.85rem;
+  height: 1.85rem;
+  border: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent-fg) 22%, transparent);
+  color: var(--accent-fg);
+  font: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.win-min:hover { background: color-mix(in srgb, var(--accent-fg) 36%, transparent); }
+
 .win-body { padding: 1.4rem 1.4rem 1.6rem; }
+.game.minimized .win-body { display: none; }
 
 /* Always-on, server-computed score/validity of the current word. */
 .game-status {

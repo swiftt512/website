@@ -42,6 +42,7 @@
       <div class="win-bar">
         <span class="win-dots" aria-hidden="true"><i></i><i></i><i></i></span>
         <h2 class="win-title" id="game-heading">woah original and new word game</h2>
+        <button class="win-min" id="win-min" type="button" aria-label="Minimize game" title="Minimize">_</button>
       </div>
 
       <div class="win-body">
@@ -90,6 +91,13 @@
   </div>
 
   <div class="cursor-trail" id="cursor-trail" aria-hidden="true"></div>
+
+  <!-- Easter egg: a tiny brick that only appears once every tile is on the board
+       and the game window is minimized. Clicking it swaps the pointer for a
+       photo whose finger is the click point; clicking it again (or a refresh)
+       puts things back. -->
+  <button class="brick" id="brick" type="button" hidden aria-label="Secret brick"></button>
+  <img class="girl-cursor" id="girl-cursor" alt="" aria-hidden="true" />
 
   <script>
     // --- Splash text (loaded from /splashes.txt so the list is easy to edit) ---
@@ -360,6 +368,7 @@
         renderRack();
         const placedCount = rack.filter((t) => t.at).length;
         submitBtn.disabled = viewing || peekLocked || submitted || placedCount === 0;
+        if (window.brickApi) window.brickApi.refresh();
       }
 
       // render + refresh the live server-scored status line.
@@ -618,9 +627,11 @@
         gridEl.scrollIntoView({ behavior: "smooth", block: "center" });
       }
 
-      // Exposed so the leaderboard's "Show word" buttons can drive the board.
+      // Exposed so the leaderboard's "Show word" buttons can drive the board,
+      // and so the brick easter egg can tell when every tile is on the board.
       window.gameApi = {
         hasSubmitted: () => hasSubmitted,
+        allPlaced: () => rack.length > 0 && rack.every((t) => t.at),
         viewEntry,
       };
 
@@ -762,6 +773,92 @@
         if (document.hidden) { running = false; }
         else if (!running) { running = true; requestAnimationFrame(frame); }
       });
+    })();
+
+    // --- Minimize / expand the embedded game window ---
+    //     Collapses the card to just its title bar and back. The game stays
+    //     in the page flow; this only shows or hides the body.
+    (function () {
+      const win = document.querySelector(".game");
+      const minBtn = document.getElementById("win-min");
+      if (!win || !minBtn) return;
+
+      minBtn.addEventListener("click", () => {
+        const min = win.classList.toggle("minimized");
+        minBtn.textContent = min ? "+" : "_";
+        minBtn.setAttribute("aria-label", min ? "Expand game" : "Minimize game");
+        minBtn.title = min ? "Expand" : "Minimize";
+        window.gameMinimized = min;
+        if (window.brickApi) window.brickApi.refresh();
+      });
+    })();
+
+    // --- Brick easter egg + "pointing girl" cursor ---
+    //     The brick appears only when every tile is on the board AND the game
+    //     window is minimized. Clicking it swaps the pointer for a photo of the
+    //     girl, lined up so her fingertip sits exactly where you click. Clicking
+    //     the brick again (or refreshing the page) restores the normal cursor.
+    (function () {
+      const brick = document.getElementById("brick");
+      const girl = document.getElementById("girl-cursor");
+      if (!brick || !girl) return;
+
+      const fine = window.matchMedia("(pointer: fine)").matches;
+
+      // Where the fingertip sits inside the photo (fraction of its width/height),
+      // and how big to draw her. Tweak GIRL_W to resize.
+      const FINGER_X = 0.31, FINGER_Y = 0.775;
+      const GIRL_W = 260, GIRL_H = Math.round(GIRL_W * (2880 / 2160));
+      girl.style.width = GIRL_W + "px";
+
+      let girlLoaded = false;
+      let active = false;
+      let lastX = window.innerWidth / 2, lastY = window.innerHeight / 2;
+
+      function conditionsMet() {
+        return !!window.gameMinimized &&
+               !!(window.gameApi && window.gameApi.allPlaced && window.gameApi.allPlaced());
+      }
+
+      // The brick stays clickable while the girl cursor is active so there's
+      // always a way to switch back, even if the board conditions change.
+      function refresh() {
+        const show = active || conditionsMet();
+        brick.hidden = !show;
+        if (show && !girlLoaded && fine) {
+          girl.src = "/pointing-girl.png"; // load the big photo only when needed
+          girlLoaded = true;
+        }
+      }
+      window.brickApi = { refresh };
+
+      function placeGirl(x, y) {
+        girl.style.transform =
+          "translate(" + (x - FINGER_X * GIRL_W) + "px," + (y - FINGER_Y * GIRL_H) + "px)";
+      }
+
+      function activate() {
+        active = true;
+        document.body.classList.add("girl-active");
+        placeGirl(lastX, lastY);
+      }
+      function deactivate() {
+        active = false;
+        document.body.classList.remove("girl-active");
+        refresh(); // may hide the brick again if the board conditions no longer hold
+      }
+
+      window.addEventListener("pointermove", (e) => {
+        lastX = e.clientX; lastY = e.clientY;
+        if (active) placeGirl(lastX, lastY);
+      }, { passive: true });
+
+      brick.addEventListener("click", () => {
+        if (!fine) return;               // the cursor swap only makes sense with a mouse
+        active ? deactivate() : activate();
+      });
+
+      refresh();
     })();
   </script>
 </body>
