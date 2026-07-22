@@ -8,8 +8,14 @@ CREATE TABLE IF NOT EXISTS leaderboard (
   puzzle_date TEXT    NOT NULL,   -- YYYY-MM-DD, the US-Central puzzle day
   name        TEXT    NOT NULL,   -- player display name
   score       INTEGER NOT NULL,
-  created_at  TEXT    NOT NULL    -- ISO-8601; tiebreak key (earliest wins)
+  created_at  TEXT    NOT NULL,   -- ISO-8601; tiebreak key (earliest wins)
+  placements  TEXT               -- JSON [{letter,row,col}] that earned the score
 );
+
+-- Migration for databases created before `placements` existed. SQLite has no
+-- "ADD COLUMN IF NOT EXISTS"; run this once per store (it errors harmlessly if
+-- the column is already there):
+--   ALTER TABLE leaderboard ADD COLUMN placements TEXT;
 
 -- Covers the daily leaderboard read: filter by date, order by rank.
 CREATE INDEX IF NOT EXISTS idx_leaderboard_rank

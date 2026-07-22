@@ -41,6 +41,8 @@
       <p class="game-sub" id="game-sub">Loading today's board…</p>
 
       <div class="game-play" id="game-play" hidden>
+        <div class="game-status idle" id="game-status" role="status" aria-live="polite">Drag tiles onto the board to build a word.</div>
+
         <div class="board-grid" id="board-grid" role="grid" aria-label="Word board"></div>
 
         <div class="rack" id="rack" aria-label="Your tiles"></div>
@@ -172,14 +174,11 @@
 
     // --- Leaderboard (fetch same-origin /api/leaderboard) ---
     //     Exposed as window.refreshLeaderboard so a successful play updates it.
+    //     Each entry that carries placements gets a "Show word" button that
+    //     replays that player's word onto the board (via window.gameApi).
     (function () {
       const list = document.getElementById("board-list");
       const dateEl = document.getElementById("board-date");
-
-      function esc(s) {
-        return String(s).replace(/[&<>"]/g, (c) =>
-          ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-      }
 
       function refresh() {
         return fetch("/api/leaderboard")
@@ -193,9 +192,32 @@
             for (const e of data.entries) {
               const li = document.createElement("li");
               li.className = "board-row";
-              li.innerHTML =
-                '<span class="board-name">' + esc(e.name) + "</span>" +
-                '<span class="board-score">' + e.score + "</span>";
+
+              const name = document.createElement("span");
+              name.className = "board-name";
+              name.textContent = e.name;
+              li.appendChild(name);
+
+              const slot = document.createElement("span");
+              slot.className = "board-action";
+              if (e.placements && e.placements.length) {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "view-btn";
+                btn.textContent = "Show word";
+                btn.title = "Show " + e.name + "'s word on the board";
+                btn.addEventListener("click", () => {
+                  if (window.gameApi) window.gameApi.viewEntry(e.placements, e.name);
+                });
+                slot.appendChild(btn);
+              }
+              li.appendChild(slot);
+
+              const score = document.createElement("span");
+              score.className = "board-score";
+              score.textContent = e.score;
+              li.appendChild(score);
+
               list.appendChild(li);
             }
           })
@@ -209,15 +231,18 @@
     })();
 
     // --- Daily word board game ---
-    //     Loads today's board from /api/puzzle, lets the player place rack tiles,
-    //     and submits placements to /api/play. The server computes the score and
-    //     validates every word — the client never scores anything or sees an answer.
+    //     Loads today's board from /api/puzzle, lets the player DRAG rack tiles
+    //     onto the board, and submits placements to /api/play. The server both
+    //     scores and validates every word — the client never computes a score.
+    //     A live status line calls /api/preview (read-only, server-scored) so the
+    //     current word's validity + points are always shown without cheating.
     (function () {
       const sub = document.getElementById("game-sub");
       const play = document.getElementById("game-play");
       const gridEl = document.getElementById("board-grid");
       const rackEl = document.getElementById("rack");
       const msgEl = document.getElementById("game-msg");
+      const statusEl = document.getElementById("game-status");
       const nameInput = document.getElementById("name-input");
       const submitBtn = document.getElementById("submit-btn");
       const recallBtn = document.getElementById("recall-btn");
@@ -227,8 +252,11 @@
       let values = {};
       let seed = {};              // "r,c" -> letter (pre-placed, fixed)
       let rack = [];              // [{ id, letter, at: null | {r,c} }]
-      let selected = null;        // rack tile id currently picked up
-      let locked = false;         // true after a play is recorded (until Recall)
+      let selected = null;        // rack tile id picked up via tap (fallback)
+      let submitted = false;      // just recorded a play (until Recall)
+      let viewing = false;        // showing another player's word (board locked)
+      let peekLocked = false;     // saw someone's word before ever submitting
+      let hasSubmitted = false;   // recorded >= 1 of your own plays this session
       const BONUS_LABEL = { dl: "DL", tl: "TL", dw: "DW", tw: "TW" };
 
       const NAME_KEY = "njdt-name";
@@ -241,9 +269,19 @@
         msgEl.textContent = text || "";
         msgEl.className = "game-msg" + (kind ? " " + kind : "");
       }
+      function setStatus(text, kind) {
+        statusEl.textContent = text || "";
+        statusEl.className = "game-status" + (kind ? " " + kind : "");
+      }
 
       function tileAt(r, c) {
         return rack.find((t) => t.at && t.at.r === r && t.at.c === c) || null;
+      }
+
+      function tileFace(letter) {
+        const v = values[letter] != null ? values[letter] : "";
+        return '<span class="tile-letter">' + letter.toUpperCase() + "</span>" +
+               '<span class="tile-value">' + v + "</span>";
       }
 
       function renderRack() {
@@ -254,24 +292,15 @@
           b.type = "button";
           b.className = "tile rack-tile" + (selected === t.id ? " selected" : "");
           b.innerHTML = tileFace(t.letter);
-          b.addEventListener("click", () => {
-            selected = selected === t.id ? null : t.id;
-            render();
-          });
+          if (!viewing) b.addEventListener("pointerdown", (e) => startDrag(e, t.id, "rack"));
           rackEl.appendChild(b);
         }
         if (!rackEl.children.length) {
           const span = document.createElement("span");
           span.className = "rack-empty";
-          span.textContent = "All tiles placed.";
+          span.textContent = viewing ? "Viewing another word." : "All tiles placed.";
           rackEl.appendChild(span);
         }
-      }
-
-      function tileFace(letter) {
-        const v = values[letter] != null ? values[letter] : "";
-        return '<span class="tile-letter">' + letter.toUpperCase() + "</span>" +
-               '<span class="tile-value">' + v + "</span>";
       }
 
       function renderGrid() {
@@ -281,6 +310,8 @@
           for (let c = 0; c < SIZE; c++) {
             const cell = document.createElement("div");
             cell.className = "cell";
+            cell.dataset.r = r;
+            cell.dataset.c = c;
             const bonus = bonuses[r] && bonuses[r][c];
             if (bonus) cell.classList.add("b-" + bonus);
 
@@ -293,13 +324,10 @@
             } else if (placed) {
               cell.classList.add("filled", "placed");
               cell.innerHTML = tileFace(placed.letter);
-              cell.setAttribute("role", "button");
-              cell.title = "Click to pick this tile back up";
-              cell.addEventListener("click", () => {
-                placed.at = null;
-                selected = placed.id;
-                render();
-              });
+              if (!viewing) {
+                cell.title = "Drag to move, or tap to pick this tile up";
+                cell.addEventListener("pointerdown", (e) => startDrag(e, placed.id, { r, c }));
+              }
             } else {
               if (bonus) {
                 const tag = document.createElement("span");
@@ -307,14 +335,14 @@
                 tag.textContent = BONUS_LABEL[bonus];
                 cell.appendChild(tag);
               }
-              cell.setAttribute("role", "button");
+              // Tap-to-place fallback for when a tile is selected via tap.
               cell.addEventListener("click", () => {
-                if (!selected) return;
+                if (viewing || selected == null) return;
                 const t = rack.find((x) => x.id === selected);
                 if (!t) return;
                 t.at = { r, c };
                 selected = null;
-                render();
+                changed();
               });
             }
             gridEl.appendChild(cell);
@@ -326,7 +354,13 @@
         renderGrid();
         renderRack();
         const placedCount = rack.filter((t) => t.at).length;
-        submitBtn.disabled = locked || placedCount === 0;
+        submitBtn.disabled = viewing || peekLocked || submitted || placedCount === 0;
+      }
+
+      // render + refresh the live server-scored status line.
+      function changed() {
+        render();
+        schedulePreview();
       }
 
       function currentPlacements() {
@@ -335,20 +369,175 @@
           .map((t) => ({ letter: t.letter, row: t.at.r, col: t.at.c }));
       }
 
+      // --- Drag and drop (pointer events; works with mouse + touch) ---
+      let drag = null;    // { id, origin, startX, startY, moved, ghost }
+      let hoverCell = null;
+
+      function startDrag(e, tileId, origin) {
+        if (viewing || e.button === 1 || e.button === 2) return;
+        e.preventDefault();
+        drag = { id: tileId, origin, startX: e.clientX, startY: e.clientY, moved: false, ghost: null };
+        window.addEventListener("pointermove", onDragMove);
+        window.addEventListener("pointerup", onDragEnd);
+        window.addEventListener("pointercancel", onDragEnd);
+      }
+
+      function makeGhost(tileId) {
+        const t = rack.find((x) => x.id === tileId);
+        const g = document.createElement("div");
+        g.className = "tile drag-ghost";
+        g.innerHTML = tileFace(t ? t.letter : "");
+        document.body.appendChild(g);
+        return g;
+      }
+
+      function moveGhost(g, x, y) {
+        g.style.left = x + "px";
+        g.style.top = y + "px";
+      }
+
+      function dropCellFrom(x, y, excludeId) {
+        const el = document.elementFromPoint(x, y);
+        const cell = el && el.closest ? el.closest(".cell") : null;
+        if (!cell || cell.dataset.r == null) return null;
+        const r = +cell.dataset.r, c = +cell.dataset.c;
+        if (seed[r + "," + c]) return null;              // can't cover a seed tile
+        const occ = tileAt(r, c);
+        if (occ && occ.id !== excludeId) return null;    // occupied by another tile
+        return { r, c, el: cell };
+      }
+
+      function setHover(cell) {
+        if (hoverCell && hoverCell !== (cell && cell.el)) hoverCell.classList.remove("drop-hover");
+        hoverCell = cell ? cell.el : null;
+        if (hoverCell) hoverCell.classList.add("drop-hover");
+      }
+
+      function onDragMove(e) {
+        if (!drag) return;
+        if (!drag.moved) {
+          if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < 6) return;
+          drag.moved = true;
+          drag.ghost = makeGhost(drag.id);
+          document.body.classList.add("dragging-tile");
+        }
+        moveGhost(drag.ghost, e.clientX, e.clientY);
+        setHover(dropCellFrom(e.clientX, e.clientY, drag.id));
+      }
+
+      function onDragEnd(e) {
+        window.removeEventListener("pointermove", onDragMove);
+        window.removeEventListener("pointerup", onDragEnd);
+        window.removeEventListener("pointercancel", onDragEnd);
+        document.body.classList.remove("dragging-tile");
+        const d = drag;
+        drag = null;
+        setHover(null);
+        if (!d) return;
+        if (d.ghost) d.ghost.remove();
+        const t = rack.find((x) => x.id === d.id);
+        if (!t) return;
+
+        if (!d.moved) {
+          // A tap, not a drag. From the rack: select/deselect. From the board:
+          // pick the tile back up into the rack.
+          if (d.origin === "rack") {
+            selected = selected === d.id ? null : d.id;
+            render();
+          } else {
+            t.at = null;
+            selected = d.id;
+            changed();
+          }
+          return;
+        }
+
+        const target = dropCellFrom(e.clientX, e.clientY, d.id);
+        if (target) {
+          t.at = { r: target.r, c: target.c };
+          selected = null;
+          changed();
+        } else if (overRack(e.clientX, e.clientY)) {
+          t.at = null;
+          selected = null;
+          changed();
+        } else {
+          // Dropped on nothing useful — leave the tile where it started.
+          render();
+        }
+      }
+
+      function overRack(x, y) {
+        const rect = rackEl.getBoundingClientRect();
+        return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+      }
+
+      // --- Live, server-computed score/validity preview (no writes) ---
+      let previewTimer = null;
+      let previewSeq = 0;
+      let lastSig = null;
+
+      function schedulePreview() {
+        const sig = currentPlacements().map((p) => p.letter + p.row + "," + p.col).sort().join("|");
+        if (sig === lastSig) return;
+        lastSig = sig;
+        clearTimeout(previewTimer);
+        previewTimer = setTimeout(runPreview, 250);
+      }
+
+      function runPreview() {
+        if (viewing) return; // status is owned by view mode
+        const placements = currentPlacements();
+        if (!placements.length) {
+          setStatus(
+            peekLocked
+              ? "You viewed another player's word — submissions are locked for today."
+              : "Drag tiles onto the board to build a word.",
+            peekLocked ? "err" : "idle"
+          );
+          return;
+        }
+        const seq = ++previewSeq;
+        setStatus("Checking…", "idle");
+        fetch("/api/preview", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ placements }),
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            if (seq !== previewSeq || viewing) return; // stale / mode changed
+            if (data.ok && data.valid) {
+              const words = (data.words || []).map((w) => w.text).join(", ");
+              setStatus(
+                "✔ " + words + " · " + data.score + " point" + (data.score === 1 ? "" : "s") +
+                  (data.usedAll ? " — all tiles bonus!" : ""),
+                "ok"
+              );
+            } else {
+              setStatus("✘ " + (data.detail || "Not a valid word yet."), "err");
+            }
+          })
+          .catch(() => {
+            if (seq === previewSeq) setStatus("Live score unavailable right now.", "idle");
+          });
+      }
+
       recallBtn.addEventListener("click", () => {
         for (const t of rack) t.at = null;
         selected = null;
-        locked = false;
+        viewing = false;
+        submitted = false;
         recallBtn.textContent = "Recall";
         msg("");
-        render();
+        changed();
       });
 
       submitBtn.addEventListener("click", () => {
         const placements = currentPlacements();
-        if (!placements.length) return;
+        if (!placements.length || viewing || peekLocked) return;
         submitBtn.disabled = true;
-        msg("Checking…");
+        msg("Recording…");
         fetch("/api/play", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -359,29 +548,68 @@
             if (status === 200 && data.ok) {
               const words = (data.words || []).map((w) => w.text).join(", ");
               msg(
-                "Scored " + data.score + " points" +
-                  (data.usedAll ? " (all tiles — bonus!)" : "") +
-                  (words ? " · " + words : "") +
-                  " — Recall to try a different word.",
+                "Recorded " + data.score + " point" + (data.score === 1 ? "" : "s") +
+                  (words ? " · " + words : "") + " — Recall to try a different word.",
                 "ok"
               );
-              // The play is recorded. Each submission is scored independently, so
-              // leave the tiles shown and lock Submit until they recall.
+              // Recorded. Each submission is scored independently, so leave the
+              // tiles shown and lock Submit until they recall.
               selected = null;
-              locked = true;
+              submitted = true;
+              hasSubmitted = true;
               recallBtn.textContent = "New word";
               render();
               if (window.refreshLeaderboard) window.refreshLeaderboard();
             } else {
               msg(data.detail || data.error || "That move isn't valid.", "err");
-              submitBtn.disabled = false;
+              render(); // re-evaluate Submit (still have tiles placed)
             }
           })
           .catch(() => {
             msg("Couldn't reach the server. Try again.", "err");
-            submitBtn.disabled = false;
+            render();
           });
       });
+
+      // Replay another player's word onto the board. If the viewer hasn't
+      // submitted yet, this locks their board for the day (with a warning) so
+      // they can't just copy a top score — the anti-cheat trade for peeking.
+      function viewEntry(placements, who) {
+        if (!Array.isArray(placements) || !placements.length) return;
+        if (!hasSubmitted && !peekLocked) {
+          const ok = window.confirm(
+            "Show " + (who || "this player") + "'s word?\n\n" +
+              "You haven't submitted your own word yet, so viewing another " +
+              "player's solution will LOCK your board for today — you won't be " +
+              "able to submit a score. Continue?"
+          );
+          if (!ok) return;
+          peekLocked = true;
+        }
+        for (const t of rack) t.at = null;
+        for (const p of placements) {
+          const letter = String(p.letter || "").toLowerCase();
+          const t = rack.find((x) => !x.at && x.letter === letter);
+          if (t) t.at = { r: p.row, c: p.col };
+        }
+        selected = null;
+        viewing = true;
+        submitted = false;
+        recallBtn.textContent = "Back to my board";
+        msg("");
+        render();
+        setStatus(
+          "Viewing " + (who || "player") + "'s word (" + placements.length + " tiles) — board locked.",
+          "view"
+        );
+        gridEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+
+      // Exposed so the leaderboard's "Show word" buttons can drive the board.
+      window.gameApi = {
+        hasSubmitted: () => hasSubmitted,
+        viewEntry,
+      };
 
       fetch("/api/puzzle")
         .then((r) => {
@@ -402,9 +630,10 @@
           }
           rack = data.rack.map((letter, i) => ({ id: i, letter, at: null }));
           sub.textContent =
-            "Place your tiles to build words off the board. Longer words and bonus squares score more.";
+            "Drag your tiles onto the board to build words off the existing letters. Longer words and bonus squares score more.";
           play.hidden = false;
           render();
+          setStatus("Drag tiles onto the board to build a word.", "idle");
         })
         .catch(() => {
           sub.textContent = "Today's board isn't available right now.";

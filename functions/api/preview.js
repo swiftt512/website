@@ -2,14 +2,16 @@ import { centralDate } from "../lib/central-time.js";
 import { getDailyPuzzle } from "../lib/puzzle.js";
 import { analyzePlay } from "../lib/scoring.js";
 
-// POST /api/play
-// Body: { name, placements: [{ letter, row, col }] }
+// POST /api/preview
+// Body: { placements: [{ letter, row, col }] }
 //
-// The client submits ONLY where it placed tiles — never a score. The server
-// loads today's puzzle, independently checks the move is legal (tiles came from
-// the rack, form contiguous connected words), validates every word against the
-// ENABLE dictionary in D1, and computes the score itself. A client-supplied
-// score field, if present, is ignored on purpose — never trust it.
+// Same verification as /api/play, but READ-ONLY: it never writes to the
+// leaderboard. It exists so the board can always show the current move's score
+// and validity without the client ever computing a score itself. The server is
+// still the only thing that scores or judges a word — this endpoint just reports
+// the result of the tiles the player has already placed (never an "answer" or an
+// optimal move), so it leaks nothing a determined player couldn't get by
+// submitting. No name, no side effects.
 export async function onRequestPost({ env, request }) {
   const date = centralDate();
 
@@ -21,7 +23,6 @@ export async function onRequestPost({ env, request }) {
   }
 
   const placements = body && body.placements;
-  const name = sanitizeName(body && body.name);
 
   let puzzle;
   try {
@@ -34,7 +35,7 @@ export async function onRequestPost({ env, request }) {
   // Structural + rack + scoring checks (no dictionary yet).
   const analysis = analyzePlay(puzzle, placements);
   if (!analysis.ok) {
-    return json({ error: analysis.error, detail: analysis.detail }, 400);
+    return json({ ok: false, valid: false, error: analysis.error, detail: analysis.detail }, 200);
   }
 
   // Every formed word must be a real word.
@@ -47,32 +48,20 @@ export async function onRequestPost({ env, request }) {
   }
   const invalid = texts.filter((t) => !known.has(t));
   if (invalid.length) {
-    return json(
-      { error: "not_a_word", detail: "Not a word: " + invalid.map((w) => w.toUpperCase()).join(", "), invalid },
-      422
-    );
+    return json({
+      ok: false,
+      valid: false,
+      error: "not_a_word",
+      detail: "Not a word: " + invalid.map((w) => w.toUpperCase()).join(", "),
+      invalid,
+    }, 200);
   }
 
-  // Legal move — record the server-computed score. We also store the placements
-  // (already validated above) so the leaderboard can replay this word onto the
-  // board for other players. It's the player's own move, not a hidden answer.
-  const createdAt = new Date().toISOString();
-  const stored = JSON.stringify(
-    placements.map((p) => ({ letter: String(p.letter).toLowerCase(), row: p.row, col: p.col }))
-  );
-  try {
-    await env.DB
-      .prepare("INSERT INTO leaderboard (puzzle_date, name, score, created_at, placements) VALUES (?, ?, ?, ?, ?)")
-      .bind(date, name, analysis.score, createdAt, stored)
-      .run();
-  } catch {
-    return json({ error: "save_failed" }, 500);
-  }
-
+  // Legal, all-real move — report the score, but record nothing.
   return json({
     ok: true,
+    valid: true,
     date,
-    name,
     score: analysis.score,
     usedAll: analysis.usedAll,
     words: analysis.words.map((w) => ({ text: w.text.toUpperCase() })),
@@ -88,11 +77,6 @@ async function lookupWords(env, texts) {
     .bind(...texts)
     .all();
   return new Set((results || []).map((r) => r.word));
-}
-
-function sanitizeName(raw) {
-  const s = (typeof raw === "string" ? raw : "").toUpperCase().replace(/[^A-Z0-9 ]/g, "").trim().slice(0, 12);
-  return s || "ANON";
 }
 
 function json(body, status = 200) {
